@@ -35,6 +35,8 @@ class ChatBotConversation:
         self.base_message_dict = {}
         self.message = []
         self.history = []
+        self.temp_history = []
+        self.temp_history_prev_len = 0
 
     def clear_base_data(self):
         self.base_message_dict.clear()
@@ -42,6 +44,11 @@ class ChatBotConversation:
 
     def clear_history(self):
         self.history.clear()
+
+    def clear_temp_history(self):
+        self.remove_temp_history_from_message()
+        self.temp_history.clear()
+        self.temp_history_prev_len = 0
 
     def build_base_system_message(self):
         self.base_message_dict.clear()
@@ -84,12 +91,14 @@ class ChatBotConversation:
         self.base_message_dict['role'] = 'user'
         self.base_message_dict['content'] = prompt
         self.history.append(deepcopy(self.base_message_dict))
+        self.temp_history.append(deepcopy(self.base_message_dict))
 
     def cache_bot_message(self, resp):
         self.base_message_dict.clear()
         self.base_message_dict['role'] = 'assistant'
         self.base_message_dict['content'] = resp
         self.history.append(deepcopy(self.base_message_dict))
+        self.temp_history.append(deepcopy(self.base_message_dict))
 
     def build_base_message(self):
         self.clear_base_data()
@@ -102,9 +111,22 @@ class ChatBotConversation:
             for i in range(length):
                 self.message.append(deepcopy(self.history[i]))
 
+    def append_temp_history(self):
+        length = len(self.temp_history)
+        if length > 0:
+            for i in range(self.temp_history_prev_len, length):
+                self.message.append(deepcopy(self.temp_history[i]))
+            self.temp_history_prev_len = length
+
     def remove_last_user_message(self):
         length = len(self.message)
         self.message.pop(length - 1)
+
+    def remove_temp_history_from_message(self):
+        length_temp_history = len(self.temp_history)
+        for i in range(length_temp_history):
+            length_message = len(self.message)
+            self.message.pop(length_message - 1)
 
 
 class ChatBot(ChatBotConversation):
@@ -141,7 +163,7 @@ class ChatBot(ChatBotConversation):
 
     @staticmethod
     def action_time():
-        return datetime.datetime.now().time().strftime('%H:%M')
+        return "The time is " + datetime.datetime.now().time().strftime('%H:%M')
 
     @staticmethod
     def text_to_speech(text):
@@ -167,7 +189,7 @@ class ChatBot(ChatBotConversation):
             completion = openai.ChatCompletion.create(
                 model=self.model_name,
                 messages=self.message,
-                max_tokens=512,
+                max_tokens=256,
                 temperature=0.7
             )
             self.remove_last_user_message()
@@ -195,7 +217,7 @@ class WakeUpManagement:
             return True
         else:
             self.current_time = time.time()
-            if self.last_wakeup_time - self.current_time >= self.wake_up_break:
+            if self.current_time - self.last_wakeup_time >= self.wake_up_break:
                 return True
             else:
                 return False
@@ -220,6 +242,7 @@ if __name__ == "__main__":
                 print('Wake up required')
                 continue
             else:
+                ai.clear_temp_history()
                 wake_obj.set_last_wakeup_time(time.time())
 
         if any(i in ai.text for i in ["exit", "close", "sleep"]):
@@ -234,7 +257,7 @@ if __name__ == "__main__":
         else:
             # history append condition true for now
             # if True:
-            # ai.append_history()
+            # ai.append_temp_history()
 
             ai.build_user_message(ai.text)
             response_all = ai.openai_chat()
@@ -247,7 +270,10 @@ if __name__ == "__main__":
                 ai.cache_user_message(ai.text)
                 response = str(response_all['choices'][0]['message']['content'])
                 ai.cache_bot_message(response)
+                ai.append_temp_history()
                 print(f'AI --> {response}')
+                print(ai.message)
+                print(ai.temp_history)
                 # ai.text_to_speech(response['choices'][0]['message']['content'])
             else:
                 reason = response_all['choices'][0]['finish_reason']
