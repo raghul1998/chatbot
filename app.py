@@ -227,6 +227,9 @@ if __name__ == "__main__":
                                          "Hope to meet soon", "peace out!"])
             execute = False
 
+        elif "time" in ai.text:
+            response = ai.action_time()
+
         # conversation
         else:
             # history append condition true for now
@@ -234,24 +237,24 @@ if __name__ == "__main__":
             # ai.append_history()
 
             ai.build_user_message(ai.text)
-            response = ai.openai_chat()
+            response_all = ai.openai_chat()
 
-            if response is False:
+            if response_all is False:
                 print('Error from openai API')
                 continue
 
-            if ai.validate_openai_response(response) is True:
+            if ai.validate_openai_response(response_all) is True:
                 ai.cache_user_message(ai.text)
-                resp_val = str(response['choices'][0]['message']['content'])
-                ai.cache_bot_message(resp_val)
-                print(f'AI --> {resp_val}')
+                response = str(response_all['choices'][0]['message']['content'])
+                ai.cache_bot_message(response)
+                print(f'AI --> {response}')
                 # ai.text_to_speech(response['choices'][0]['message']['content'])
             else:
-                reason = response['choices'][0]['finish_reason']
+                reason = response_all['choices'][0]['finish_reason']
                 print(f'AI --> Request process failed. Reason {reason}')
                 continue
 
         # ai.text_to_speech(response)
-        ai.tts(response['choices'][0]['message']['content'])
+        ai.tts(response)
 
     print("----- Closing down Jarvis -----")
